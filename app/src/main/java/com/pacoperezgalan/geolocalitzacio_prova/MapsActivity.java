@@ -6,6 +6,7 @@ import android.Manifest;
 import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.location.Criteria;
+import android.location.Geocoder;
 import android.location.Location;
 
 
@@ -32,8 +33,14 @@ import com.google.android.gms.common.ConnectionResult;
 import com.google.android.gms.common.GooglePlayServicesNotAvailableException;
 import com.google.android.gms.common.GooglePlayServicesRepairableException;
 import com.google.android.gms.common.api.GoogleApiClient;
+import com.google.android.gms.common.api.PendingResult;
+import com.google.android.gms.common.api.ResultCallback;
+import com.google.android.gms.identity.intents.Address;
 import com.google.android.gms.location.LocationServices;
+import com.google.android.gms.location.places.GeoDataApi;
 import com.google.android.gms.location.places.Place;
+import com.google.android.gms.location.places.PlaceBuffer;
+import com.google.android.gms.location.places.Places;
 import com.google.android.gms.location.places.ui.PlacePicker;
 import com.google.android.gms.maps.CameraUpdate;
 import com.google.android.gms.maps.CameraUpdateFactory;
@@ -59,7 +66,9 @@ import java.net.HttpURLConnection;
 import java.net.MalformedURLException;
 import java.net.ProtocolException;
 import java.net.URL;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 
 import static com.google.android.gms.analytics.internal.zzy.m;
 
@@ -76,11 +85,10 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
 
     Button sitios;
     Button vista;
-    /*
-    private List<Polyline> polylineList;
-    private List<Marker> marcasOrigen;
-    private List<Marker> marcasDestino;
-    */
+
+    ArrayList<Lugar> lugaresList;
+    ArrayList<Place> placesList;
+    PendingResult<PlaceBuffer> pendingResult;
     @Override
     protected void onStart() {
         mGoogleApiClient.connect();
@@ -105,8 +113,11 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
 
         sitios = (Button) findViewById(R.id.btn_seleccionarLugar);
         vista = (Button) findViewById(R.id.btn_vista);
+        lugaresList=new ArrayList<Lugar>();
+        placesList=new ArrayList<Place>();
 
-// Create an instance of GoogleAPIClient.
+
+        // Create an instance of GoogleAPIClient.
         if (mGoogleApiClient == null) {
             // ATTENTION: This "addApi(AppIndex.API)"was auto-generated to implement the App Indexing API.
             // See https://g.co/AppIndexing/AndroidStudio for more information.
@@ -123,7 +134,8 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
         sitios.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
-                getGooglePlaces();
+                //getGooglePlaces();
+                comprovaConnexio();
             }
         });
 
@@ -133,7 +145,7 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
                 if (mMap.getMapType() == GoogleMap.MAP_TYPE_NORMAL) {
                     mMap.setMapType(GoogleMap.MAP_TYPE_HYBRID);
                     vista.setText("Vista normal");
-                    comprovaConnexio();
+
                 } else {
                     mMap.setMapType(GoogleMap.MAP_TYPE_NORMAL);
                     vista.setText("Vista satelite");
@@ -144,32 +156,19 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
 
     }
 
-    int PLACE_PICKER_REQUEST = 1;
-
-    public void getGooglePlaces() {
-
-        PlacePicker.IntentBuilder builder = new PlacePicker.IntentBuilder();
-
-        try {
-            startActivityForResult(builder.build(this), PLACE_PICKER_REQUEST);
-        } catch (GooglePlayServicesRepairableException e) {
-            e.printStackTrace();
-        } catch (GooglePlayServicesNotAvailableException e) {
-            e.printStackTrace();
+    public void detallesLugares(){
+        for(int i=0;i<lugaresList.size();i++){
+            Place place= (Place) Places.GeoDataApi.getPlaceById(mGoogleApiClient, lugaresList.get(i).getId());
+            placesList.add(place);
         }
+
+        for(int i=0;i<placesList.size();i++){
+
+            placesList.get(i).getWebsiteUri();
+        }
+
     }
 
-    protected void onActivityResult(int requestCode, int resultCode, Intent data) {
-        if (requestCode == PLACE_PICKER_REQUEST) {
-            if (resultCode == RESULT_OK) {
-                Place place = PlacePicker.getPlace(data, this);
-                String toastMsg = String.format("Place: %s", place.getName());
-                Toast.makeText(this, toastMsg, Toast.LENGTH_LONG).show();
-
-
-            }
-        }
-    }
 
 
     @Override
@@ -178,12 +177,13 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
         mMap.setMapType(GoogleMap.MAP_TYPE_NORMAL);
         mMap.getUiSettings().setRotateGesturesEnabled(true);
         mMap.getUiSettings().setMapToolbarEnabled(true);
+        ActivityCompat.requestPermissions(MapsActivity.this, new String[]{Manifest.permission.ACCESS_FINE_LOCATION}, 1);
+        ActivityCompat.requestPermissions(MapsActivity.this, new String[]{Manifest.permission.ACCESS_COARSE_LOCATION}, 2);
         if (ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED && ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
 
             return;
-        }else {
-            mMap.setMyLocationEnabled(true);
         }
+        mMap.setMyLocationEnabled(true);
 
     }
 
@@ -249,6 +249,7 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
 
     }
 
+
     //parte coger cosas de url api google/////////////////////////////////////////////////////////////////////////////
 
     protected boolean comprovaConnexio() {
@@ -256,7 +257,7 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
         NetworkInfo networkInfo = connMgr.getActiveNetworkInfo();
         if (networkInfo != null && networkInfo.isConnected()) {
 
-            new ConectaURL().execute("https://maps.googleapis.com/maps/api/place/nearbysearch/json?key=218f29d4bc4537f7215442077c55ee1502fc0a4a&location=725469.221836251905188,%204373239.299544908106327&radius=2000");
+            new ConectaURL().execute("https://maps.googleapis.com/maps/api/place/nearbysearch/json?key=AIzaSyB38CQ8uYvqAmZfTnXAjX1A3IPEYHun-9s&location="+mMap.getMyLocation().getLatitude()+","+mMap.getMyLocation().getLongitude()+"&radius=500");
             return true;
         } else {
             /*
@@ -289,7 +290,7 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
 
             long tempsInicial = System.currentTimeMillis();
 
-            //parsejaJSON(documentJSON);
+            parsejaJSON(documentJSON);
 
             long tempsFinal = System.currentTimeMillis();
 
@@ -327,7 +328,7 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
 
             resposta = converteixStreamAString(is);
 
-            Log.d("tag","Resposta/////////////////////////////////////////////////////////////////////////////////////: ("+response+")"+resposta);
+            Log.d("tag","Resposta/////////////////////: ("+response+")"+resposta);
 
 
         } catch (MalformedURLException e) {
@@ -365,51 +366,44 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
         }
         return sb.toString();
     }
-    /*
+
     private void parsejaJSON(String documentJSON) {
 
         Log.d("tag", "Resposta2: " + documentJSON);
 
         if (documentJSON != null) {
             try {
+                JSONObject jsonTodo = new JSONObject(documentJSON);
+                JSONArray jsonResultados = jsonTodo.getJSONArray("results") ;
 
-                JSONArray jsonPosts = new JSONArray(documentJSON) ;
+                for (int i = 0; i < jsonResultados.length(); i++) {
+                    JSONObject jsonObj = jsonResultados.getJSONObject(i);
 
-                for (int i = 0; i < jsonPosts.length(); i++) {
-                    JSONObject jsonObj = jsonPosts.getJSONObject(i);
-
-                    int id = jsonObj.getInt("id");
-                    String title = jsonObj.getString("title");
-                    String body = jsonObj.getString("body");
+                    String id = jsonObj.getString("id");
 
 
+                    Lugar unLugar = new Lugar();
+
+                    unLugar.setId(id);
 
 
-
-                    Post unPost = new Post();
-
-                    unPost.setId(id);
-                    unPost.setTitle(title);
-                    unPost.setBody(body);
-
-                    Log.d("tag",unPost.toString());
-                    postList.add(unPost);
+                    Log.d("tag",unLugar.getId().toString());
+                    lugaresList.add(unLugar);
                 }
             } catch (final JSONException e) {
                 Log.e("tag", "Error parsejant Json: " + e.getMessage());
-                Snackbar.make(findViewById(R.id.recyclerPost),
-                        "Error parsejant Json", Snackbar.LENGTH_LONG).show();
+                //Snackbar.make(findViewById(R.id.recyclerPost), "Error parsejant Json", Snackbar.LENGTH_LONG).show();
             }
         } else {
             Log.e("tag", "Error intentant rebre el Json.");
-            Snackbar.make(findViewById(R.id.recyclerPost),
-                    "Error intentant rebre el Json.", Snackbar.LENGTH_LONG).show();
-
+            //Snackbar.make(findViewById(R.id.recyclerPost), "Error intentant rebre el Json.", Snackbar.LENGTH_LONG).show();
 
         }
 
     }
-    */
+
+
+
 
     /*
     private void meuaUbicacio() {
@@ -429,6 +423,34 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
             actualitzarUbicacio(location);
         } else {
             Toast.makeText(this, "meua Ubicacio: location null", Toast.LENGTH_SHORT).show();
+        }
+    }
+
+
+    int PLACE_PICKER_REQUEST = 1;
+
+    public void getGooglePlaces() {
+
+        PlacePicker.IntentBuilder builder = new PlacePicker.IntentBuilder();
+
+        try {
+            startActivityForResult(builder.build(this), PLACE_PICKER_REQUEST);
+        } catch (GooglePlayServicesRepairableException e) {
+            e.printStackTrace();
+        } catch (GooglePlayServicesNotAvailableException e) {
+            e.printStackTrace();
+        }
+    }
+
+    protected void onActivityResult(int requestCode, int resultCode, Intent data) {
+        if (requestCode == PLACE_PICKER_REQUEST) {
+            if (resultCode == RESULT_OK) {
+                Place place = PlacePicker.getPlace(data, this);
+                String toastMsg = String.format("Place: %s", place.getName());
+                Toast.makeText(this, toastMsg, Toast.LENGTH_LONG).show();
+
+
+            }
         }
     }
 */
