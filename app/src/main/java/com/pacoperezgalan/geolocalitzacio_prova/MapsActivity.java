@@ -90,8 +90,6 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
     Marker marcador;
     Double lat = 0.0;
     double lng = 0.0;
-    LocationManager locationManager;
-    Location location;
 
     GoogleApiClient mGoogleApiClient;
 
@@ -100,7 +98,7 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
 
     ArrayList<Lugar> lugaresList;
     ArrayList<Place> placesList;
-
+    ArrayList<Marker> markerArrayList;
 
     /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     @Override
@@ -112,6 +110,7 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
         vista = (Button) findViewById(R.id.btn_vista);
         lugaresList=new ArrayList<Lugar>();
         placesList=new ArrayList<Place>();
+        markerArrayList=new ArrayList<Marker>();
 
 
         // Create an instance of GoogleAPIClient.
@@ -126,7 +125,7 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
                     .addApi(AppIndex.API).build();
         }
         // Obtain the SupportMapFragment and get notified when the map is ready to be used.
-        SupportMapFragment mapFragment = (SupportMapFragment) getSupportFragmentManager().findFragmentById(R.id.map);
+        final SupportMapFragment mapFragment = (SupportMapFragment) getSupportFragmentManager().findFragmentById(R.id.map);
         mapFragment.getMapAsync(this);
 
 
@@ -134,7 +133,7 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
             @Override
             public void onClick(View view) {
                 //getGooglePlaces();
-                comprovaConnexio();
+                //comprovaConnexio();
             }
         });
 
@@ -151,22 +150,11 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
                 }
             }
         });
-        mMap.setOnCameraChangeListener(new GoogleMap.OnCameraChangeListener() {
-            @Override
-            public void onCameraChange(CameraPosition cameraPosition) {
-                comprovaConnexio();
-                Toast.makeText(getApplicationContext(),"menejant camara",Toast.LENGTH_SHORT).show();
-            }
-        });
-
-
-
-
     }
 
 
     public void pintarLugaresMapa(){
-        /*
+/*
         for(int i=0;i<lugaresList.size();i++){
 
             PendingResult<PlaceBuffer> place= Places.GeoDataApi.getPlaceById(mGoogleApiClient, lugaresList.get(i).getId())
@@ -195,21 +183,22 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
             agregarMarcador(lat,lng,bitmap);
         }
         */
-        ArrayList<Marker> markerArrayList=new ArrayList<Marker>();
-        for(int i=0;i<lugaresList.size();i++){
-            Bitmap bitmap;
-            ImageView iv=new ImageView(getApplicationContext());
 
-            Picasso.with(getApplicationContext()).load(lugaresList.get(i).getIcon()).into(iv);
-            bitmap=iv.getDrawingCache();
+        Bitmap bitmap;
+        bitmap= Bitmap.createScaledBitmap(BitmapFactory.decodeResource(getResources(),R.drawable.icon_restaurant),100,100,false);
+
+        for(int i=0;i<lugaresList.size();i++){
+
 
             Double lat=lugaresList.get(i).getLat();
             Double lng=lugaresList.get(i).getLng();
             LatLng coordenades = new LatLng(lat, lng);
-            mMap.addMarker(new MarkerOptions()
+            markerArrayList.add(mMap.addMarker(new MarkerOptions()
                     .position(coordenades)
                     .title(lugaresList.get(i).getName())
-                    .icon(BitmapDescriptorFactory.fromResource(R.drawable.image_ubicacio)));
+                    .icon(BitmapDescriptorFactory.fromBitmap(bitmap))));
+
+            //new BitmapFromURL(lugaresList.get(i),mMap).execute(lugaresList.get(i).getIcon());
             //BitmapDescriptorFactory.fromResource(R.drawable.image_ubicacio))      BitmapDescriptorFactory.fromBitmap(icon))
         }
 
@@ -221,7 +210,7 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
         mMap.setMapType(GoogleMap.MAP_TYPE_NORMAL);
         mMap.getUiSettings().setRotateGesturesEnabled(true);
         mMap.getUiSettings().setMapToolbarEnabled(true);
-        //mMap.getCameraPosition().target.latitude.;
+
         ActivityCompat.requestPermissions(MapsActivity.this, new String[]{Manifest.permission.ACCESS_FINE_LOCATION}, 1);
         ActivityCompat.requestPermissions(MapsActivity.this, new String[]{Manifest.permission.ACCESS_COARSE_LOCATION}, 2);
         if (ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED && ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
@@ -231,20 +220,26 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
         mMap.setMyLocationEnabled(true);
 
 
+        mMap.setOnCameraMoveStartedListener(new GoogleMap.OnCameraMoveStartedListener() {
+            @Override
+            public void onCameraMoveStarted(int i) {
+
+            }
+        });
+        mMap.setOnCameraIdleListener(new GoogleMap.OnCameraIdleListener() {
+            @Override
+            public void onCameraIdle() {
+                mMap.clear();
+                lugaresList.clear();
+                markerArrayList.clear();
+                comprovaConnexio();
+                //Toast.makeText(getApplicationContext(),"menejant camara",Toast.LENGTH_SHORT).show();
+            }
+        });
+
     }
 
-    private void agregarMarcador(Double lat, Double lng, Bitmap icon) {
-        LatLng coordenades = new LatLng(lat, lng);
-        CameraUpdate mUbicacio = CameraUpdateFactory.newLatLngZoom(coordenades, 15);
-        if (marcador != null) marcador.remove();
 
-        marcador = mMap.addMarker(new MarkerOptions()
-                .position(coordenades)
-                .title("La meua ubicacio")
-                .icon(BitmapDescriptorFactory.fromResource(R.drawable.image_ubicacio)));
-        //BitmapDescriptorFactory.fromResource(R.drawable.image_ubicacio))      BitmapDescriptorFactory.fromBitmap(icon))
-        mMap.animateCamera(mUbicacio);
-    }
 
     private void actualitzarUbicacio(Location location) {
         if (location != null) {
@@ -269,7 +264,7 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
         NetworkInfo networkInfo = connMgr.getActiveNetworkInfo();
         if (networkInfo != null && networkInfo.isConnected()) {
 
-            new ConectaURL().execute("https://maps.googleapis.com/maps/api/place/nearbysearch/json?key=AIzaSyB38CQ8uYvqAmZfTnXAjX1A3IPEYHun-9s&location="+mMap.getCameraPosition().target.latitude+","+mMap.getCameraPosition().target.longitude+"&radius=500");
+            new ConectaURL().execute("https://maps.googleapis.com/maps/api/place/nearbysearch/json?key=AIzaSyB38CQ8uYvqAmZfTnXAjX1A3IPEYHun-9s&location="+mMap.getCameraPosition().target.latitude+","+mMap.getCameraPosition().target.longitude+"&radius=500&types=food");
             return true;
         } else {
             /*
@@ -421,25 +416,43 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
 
     }
 
-    public static Bitmap getBitmapFromURL(String src) {
+    public static  class  BitmapFromURL extends AsyncTask<String,Void,Object>{
+        Lugar unLugar;
+        GoogleMap mMap;
 
+        public BitmapFromURL(Lugar lloc,GoogleMap map){
+            unLugar=lloc;
+            mMap=map;
+        }
+        @Override
+        protected Object doInBackground(String... src) {
             Log.d("tag","intentant agafar bitmap de url........:    "+src);
             Bitmap bitmap;
-        try {
-            URL url = new URL(src);
-            HttpURLConnection connection = (HttpURLConnection) url.openConnection();
-            connection.setDoInput(true);
-            connection.connect();
-            InputStream input = connection.getInputStream();
-            Bitmap myBitmap = BitmapFactory.decodeStream(input);
-            return myBitmap;
-        } catch (IOException e) {
-            e.printStackTrace();
-            Log.d("tag","no sha pogut agarrar el bitmap   "+src);
-            return null;
+            try {
+                URL url = new URL(src[0]);
+                HttpURLConnection connection = (HttpURLConnection) url.openConnection();
+                connection.setDoInput(true);
+                connection.connect();
+                InputStream input = connection.getInputStream();
+                Bitmap myBitmap = BitmapFactory.decodeStream(input);
+                return myBitmap;
+            } catch (IOException e) {
+                e.printStackTrace();
+                Log.d("tag","no sha pogut agarrar el bitmap   "+src);
+                return null;
+            }
         }
-
-
+        @Override
+        protected void onPostExecute(Object bitmap) {
+            super.onPostExecute(bitmap);
+            Double lat=unLugar.getLat();
+            Double lng=unLugar.getLng();
+            LatLng coordenades = new LatLng(lat, lng);
+            mMap.addMarker(new MarkerOptions()
+                    .position(coordenades)
+                    .title(unLugar.getName())
+                    .icon(BitmapDescriptorFactory.fromBitmap((Bitmap)bitmap)));
+        }
     }
 
 
@@ -512,6 +525,20 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
     }
 
     /*
+    private void agregarMarcador(Double lat, Double lng, Bitmap icon) {
+        LatLng coordenades = new LatLng(lat, lng);
+        CameraUpdate mUbicacio = CameraUpdateFactory.newLatLngZoom(coordenades, 15);
+        if (marcador != null) marcador.remove();
+
+        marcador = mMap.addMarker(new MarkerOptions()
+                .position(coordenades)
+                .title("La meua ubicacio")
+                .icon(BitmapDescriptorFactory.fromResource(R.drawable.image_ubicacio)));
+        //BitmapDescriptorFactory.fromResource(R.drawable.image_ubicacio))      BitmapDescriptorFactory.fromBitmap(icon))
+        mMap.animateCamera(mUbicacio);
+    }
+
+
     private void meuaUbicacio() {
 
         ActivityCompat.requestPermissions(MapsActivity.this, new String[]{Manifest.permission.ACCESS_FINE_LOCATION}, 1);
