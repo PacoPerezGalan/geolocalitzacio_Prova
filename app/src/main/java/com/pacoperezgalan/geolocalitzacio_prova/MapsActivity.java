@@ -5,6 +5,10 @@ import android.*;
 import android.Manifest;
 import android.content.Intent;
 import android.content.pm.PackageManager;
+import android.graphics.Bitmap;
+import android.graphics.BitmapFactory;
+import android.graphics.drawable.Drawable;
+import android.graphics.drawable.Icon;
 import android.location.Criteria;
 import android.location.Geocoder;
 import android.location.Location;
@@ -24,6 +28,7 @@ import android.os.Bundle;
 import android.util.Log;
 import android.view.View;
 import android.widget.Button;
+import android.widget.ImageView;
 import android.widget.Toast;
 
 import com.google.android.gms.appindexing.Action;
@@ -48,6 +53,7 @@ import com.google.android.gms.maps.GoogleMap;
 import com.google.android.gms.maps.OnMapReadyCallback;
 import com.google.android.gms.maps.SupportMapFragment;
 import com.google.android.gms.maps.model.BitmapDescriptorFactory;
+import com.google.android.gms.maps.model.CameraPosition;
 import com.google.android.gms.maps.model.LatLng;
 import com.google.android.gms.maps.model.Marker;
 import com.google.android.gms.maps.model.MarkerOptions;
@@ -66,11 +72,17 @@ import java.net.HttpURLConnection;
 import java.net.MalformedURLException;
 import java.net.ProtocolException;
 import java.net.URL;
+import java.net.URLConnection;
 import java.util.ArrayList;
-import java.util.List;
-import java.util.Locale;
 
-import static com.google.android.gms.analytics.internal.zzy.m;
+import it.sephiroth.android.library.picasso.Picasso;
+import it.sephiroth.android.library.picasso.Target;
+
+import static android.R.attr.bitmap;
+import static android.icu.lang.UCharacter.GraphemeClusterBreak.T;
+import static com.google.android.gms.analytics.internal.zzy.n;
+import static it.sephiroth.android.library.picasso.Picasso.with;
+
 
 public class MapsActivity extends FragmentActivity implements OnMapReadyCallback, GoogleApiClient.ConnectionCallbacks, GoogleApiClient.OnConnectionFailedListener {
 
@@ -88,24 +100,9 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
 
     ArrayList<Lugar> lugaresList;
     ArrayList<Place> placesList;
-    PendingResult<PlaceBuffer> pendingResult;
-    @Override
-    protected void onStart() {
-        mGoogleApiClient.connect();
-        super.onStart();
-        // ATTENTION: This was auto-generated to implement the App Indexing API.
-        // See https://g.co/AppIndexing/AndroidStudio for more information.
-        AppIndex.AppIndexApi.start(mGoogleApiClient, getIndexApiAction());
-    }
 
-    @Override
-    protected void onStop() {
-        mGoogleApiClient.disconnect();
-        super.onStop();// ATTENTION: This was auto-generated to implement the App Indexing API.
-// See https://g.co/AppIndexing/AndroidStudio for more information.
-        AppIndex.AppIndexApi.end(mGoogleApiClient, getIndexApiAction());
-    }
 
+    /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -125,11 +122,13 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
                     .addConnectionCallbacks(this)
                     .addOnConnectionFailedListener(this)
                     .addApi(LocationServices.API)
+                    .addApi(Places.GEO_DATA_API)
                     .addApi(AppIndex.API).build();
         }
         // Obtain the SupportMapFragment and get notified when the map is ready to be used.
         SupportMapFragment mapFragment = (SupportMapFragment) getSupportFragmentManager().findFragmentById(R.id.map);
         mapFragment.getMapAsync(this);
+
 
         sitios.setOnClickListener(new View.OnClickListener() {
             @Override
@@ -152,24 +151,69 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
                 }
             }
         });
+        mMap.setOnCameraChangeListener(new GoogleMap.OnCameraChangeListener() {
+            @Override
+            public void onCameraChange(CameraPosition cameraPosition) {
+                comprovaConnexio();
+                Toast.makeText(getApplicationContext(),"menejant camara",Toast.LENGTH_SHORT).show();
+            }
+        });
+
+
 
 
     }
 
-    public void detallesLugares(){
+
+    public void pintarLugaresMapa(){
+        /*
         for(int i=0;i<lugaresList.size();i++){
-            Place place= (Place) Places.GeoDataApi.getPlaceById(mGoogleApiClient, lugaresList.get(i).getId());
-            placesList.add(place);
+
+            PendingResult<PlaceBuffer> place= Places.GeoDataApi.getPlaceById(mGoogleApiClient, lugaresList.get(i).getId())
+                    .setResultCallback(new ResultCallback<PlaceBuffer>() {
+                        @Override
+                        public void onResult(PlaceBuffer places) {
+                            if (places.getStatus().isSuccess() && places.getCount() > 0) {
+                                final Place myPlace = places.get(0);
+                                Log.i("tag", "Place found: " + myPlace.getName());
+                            } else {
+                                Log.e("tag", "Place not found");
+                            }
+                            places.release();
+                        }
+                    });
+
+
+
+            placesList.add(place.await().get(0));
         }
 
         for(int i=0;i<placesList.size();i++){
+            Bitmap bitmap= getBitmapFromURL(lugaresList.get(i).getIcon());
+            Double lat=placesList.get(i).getLatLng().latitude;
+            Double lng=placesList.get(i).getLatLng().longitude;
+            agregarMarcador(lat,lng,bitmap);
+        }
+        */
+        ArrayList<Marker> markerArrayList=new ArrayList<Marker>();
+        for(int i=0;i<lugaresList.size();i++){
+            Bitmap bitmap;
+            ImageView iv=new ImageView(getApplicationContext());
 
-            placesList.get(i).getWebsiteUri();
+            Picasso.with(getApplicationContext()).load(lugaresList.get(i).getIcon()).into(iv);
+            bitmap=iv.getDrawingCache();
+
+            Double lat=lugaresList.get(i).getLat();
+            Double lng=lugaresList.get(i).getLng();
+            LatLng coordenades = new LatLng(lat, lng);
+            mMap.addMarker(new MarkerOptions()
+                    .position(coordenades)
+                    .title(lugaresList.get(i).getName())
+                    .icon(BitmapDescriptorFactory.fromResource(R.drawable.image_ubicacio)));
+            //BitmapDescriptorFactory.fromResource(R.drawable.image_ubicacio))      BitmapDescriptorFactory.fromBitmap(icon))
         }
 
     }
-
-
 
     @Override
     public void onMapReady(GoogleMap googleMap) {
@@ -177,6 +221,7 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
         mMap.setMapType(GoogleMap.MAP_TYPE_NORMAL);
         mMap.getUiSettings().setRotateGesturesEnabled(true);
         mMap.getUiSettings().setMapToolbarEnabled(true);
+        //mMap.getCameraPosition().target.latitude.;
         ActivityCompat.requestPermissions(MapsActivity.this, new String[]{Manifest.permission.ACCESS_FINE_LOCATION}, 1);
         ActivityCompat.requestPermissions(MapsActivity.this, new String[]{Manifest.permission.ACCESS_COARSE_LOCATION}, 2);
         if (ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED && ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
@@ -185,9 +230,10 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
         }
         mMap.setMyLocationEnabled(true);
 
+
     }
 
-    private void agregarMarcador(Double lat, Double lng) {
+    private void agregarMarcador(Double lat, Double lng, Bitmap icon) {
         LatLng coordenades = new LatLng(lat, lng);
         CameraUpdate mUbicacio = CameraUpdateFactory.newLatLngZoom(coordenades, 15);
         if (marcador != null) marcador.remove();
@@ -196,6 +242,7 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
                 .position(coordenades)
                 .title("La meua ubicacio")
                 .icon(BitmapDescriptorFactory.fromResource(R.drawable.image_ubicacio)));
+        //BitmapDescriptorFactory.fromResource(R.drawable.image_ubicacio))      BitmapDescriptorFactory.fromBitmap(icon))
         mMap.animateCamera(mUbicacio);
     }
 
@@ -204,50 +251,15 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
             lat = location.getLatitude();
             lng = location.getLongitude();
             Toast.makeText(this, "Localizacion chachi: " + lat + "   " + lng, Toast.LENGTH_SHORT).show();
-            agregarMarcador(lat, lng);
+            //agregarMarcador(lat, lng);
+            mMap.animateCamera(CameraUpdateFactory.newLatLngZoom(new LatLng(lat,lng), 15));
         } else {
 
         }
     }
 
-    public Action getIndexApiAction() {
-        Thing object = new Thing.Builder()
-                .setName("Maps Page") // TODO: Define a title for the content shown.
-                // TODO: Make sure this auto-generated URL is correct.
-                .setUrl(Uri.parse("http://[ENTER-YOUR-URL-HERE]"))
-                .build();
-        return new Action.Builder(Action.TYPE_VIEW)
-                .setObject(object)
-                .setActionStatus(Action.STATUS_TYPE_COMPLETED)
-                .build();
-    }
 
-    @Override
-    public void onConnectionFailed(@NonNull ConnectionResult connectionResult) {
 
-    }
-
-    @Override
-    public void onConnected(@Nullable Bundle bundle) {
-        if (ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED && ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
-
-            return;
-        }
-
-        Location mLastLocation = LocationServices.FusedLocationApi.getLastLocation(
-                mGoogleApiClient);
-        if (mLastLocation != null) {
-            actualitzarUbicacio(mLastLocation);
-        } else {
-            Toast.makeText(this, "onConnected: location null", Toast.LENGTH_SHORT).show();
-        }
-
-    }
-
-    @Override
-    public void onConnectionSuspended(int i) {
-
-    }
 
 
     //parte coger cosas de url api google/////////////////////////////////////////////////////////////////////////////
@@ -257,7 +269,7 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
         NetworkInfo networkInfo = connMgr.getActiveNetworkInfo();
         if (networkInfo != null && networkInfo.isConnected()) {
 
-            new ConectaURL().execute("https://maps.googleapis.com/maps/api/place/nearbysearch/json?key=AIzaSyB38CQ8uYvqAmZfTnXAjX1A3IPEYHun-9s&location="+mMap.getMyLocation().getLatitude()+","+mMap.getMyLocation().getLongitude()+"&radius=500");
+            new ConectaURL().execute("https://maps.googleapis.com/maps/api/place/nearbysearch/json?key=AIzaSyB38CQ8uYvqAmZfTnXAjX1A3IPEYHun-9s&location="+mMap.getCameraPosition().target.latitude+","+mMap.getCameraPosition().target.longitude+"&radius=500");
             return true;
         } else {
             /*
@@ -300,6 +312,7 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
         @Override
         protected void onPostExecute(String s) {
             super.onPostExecute(s);
+            pintarLugaresMapa();
             //adaptadorRecyclerPost.notifyDataSetChanged();
 
         }
@@ -379,13 +392,19 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
                 for (int i = 0; i < jsonResultados.length(); i++) {
                     JSONObject jsonObj = jsonResultados.getJSONObject(i);
 
-                    String id = jsonObj.getString("id");
-
+                    String place_id = jsonObj.getString("place_id");
+                    String icon=jsonObj.getString("icon");
+                    String name=jsonObj.getString("name");
+                    Double lat=Double.parseDouble(jsonObj.getJSONObject("geometry").getJSONObject("location").getString("lat"));
+                    Double lng=Double.parseDouble(jsonObj.getJSONObject("geometry").getJSONObject("location").getString("lng"));
 
                     Lugar unLugar = new Lugar();
 
-                    unLugar.setId(id);
-
+                    unLugar.setId(place_id);
+                    unLugar.setIcon(icon);
+                    unLugar.setName(name);
+                    unLugar.setLat(lat);
+                    unLugar.setLng(lng);
 
                     Log.d("tag",unLugar.getId().toString());
                     lugaresList.add(unLugar);
@@ -402,8 +421,95 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
 
     }
 
+    public static Bitmap getBitmapFromURL(String src) {
+
+            Log.d("tag","intentant agafar bitmap de url........:    "+src);
+            Bitmap bitmap;
+        try {
+            URL url = new URL(src);
+            HttpURLConnection connection = (HttpURLConnection) url.openConnection();
+            connection.setDoInput(true);
+            connection.connect();
+            InputStream input = connection.getInputStream();
+            Bitmap myBitmap = BitmapFactory.decodeStream(input);
+            return myBitmap;
+        } catch (IOException e) {
+            e.printStackTrace();
+            Log.d("tag","no sha pogut agarrar el bitmap   "+src);
+            return null;
+        }
 
 
+    }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    @Override
+    protected void onStart() {
+        mGoogleApiClient.connect();
+        super.onStart();
+        // ATTENTION: This was auto-generated to implement the App Indexing API.
+        // See https://g.co/AppIndexing/AndroidStudio for more information.
+        AppIndex.AppIndexApi.start(mGoogleApiClient, getIndexApiAction());
+    }
+
+    @Override
+    protected void onStop() {
+        mGoogleApiClient.disconnect();
+        super.onStop();// ATTENTION: This was auto-generated to implement the App Indexing API.
+// See https://g.co/AppIndexing/AndroidStudio for more information.
+        AppIndex.AppIndexApi.end(mGoogleApiClient, getIndexApiAction());
+    }
+
+    public Action getIndexApiAction() {
+        Thing object = new Thing.Builder()
+                .setName("Maps Page") // TODO: Define a title for the content shown.
+                // TODO: Make sure this auto-generated URL is correct.
+                .setUrl(Uri.parse("http://[ENTER-YOUR-URL-HERE]"))
+                .build();
+        return new Action.Builder(Action.TYPE_VIEW)
+                .setObject(object)
+                .setActionStatus(Action.STATUS_TYPE_COMPLETED)
+                .build();
+    }
+
+    @Override
+    public void onConnectionFailed(@NonNull ConnectionResult connectionResult) {
+
+    }
+
+    @Override
+    public void onConnected(@Nullable Bundle bundle) {
+        if (ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED && ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
+
+            return;
+        }
+
+        Location mLastLocation = LocationServices.FusedLocationApi.getLastLocation(
+                mGoogleApiClient);
+        if (mLastLocation != null) {
+            actualitzarUbicacio(mLastLocation);
+        } else {
+            Toast.makeText(this, "onConnected: location null", Toast.LENGTH_SHORT).show();
+        }
+
+    }
+
+    @Override
+    public void onConnectionSuspended(int i) {
+
+    }
 
     /*
     private void meuaUbicacio() {
@@ -453,5 +559,5 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
             }
         }
     }
-*/
+**/
 }
