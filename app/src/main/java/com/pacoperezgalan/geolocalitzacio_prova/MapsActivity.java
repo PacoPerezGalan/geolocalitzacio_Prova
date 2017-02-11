@@ -1,9 +1,9 @@
 package com.pacoperezgalan.geolocalitzacio_prova;
 
 
-import android.*;
+
 import android.Manifest;
-import android.content.Intent;
+
 import android.content.pm.PackageManager;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
@@ -80,6 +80,7 @@ import it.sephiroth.android.library.picasso.Target;
 
 import static android.R.attr.bitmap;
 import static android.icu.lang.UCharacter.GraphemeClusterBreak.T;
+import static com.google.android.gms.analytics.internal.zzy.m;
 import static com.google.android.gms.analytics.internal.zzy.n;
 import static it.sephiroth.android.library.picasso.Picasso.with;
 
@@ -93,7 +94,6 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
 
     GoogleApiClient mGoogleApiClient;
 
-    Button sitios;
     Button vista;
 
     ArrayList<Lugar> lugaresList;
@@ -106,7 +106,7 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_maps);
 
-        sitios = (Button) findViewById(R.id.btn_seleccionarLugar);
+
         vista = (Button) findViewById(R.id.btn_vista);
         lugaresList=new ArrayList<Lugar>();
         placesList=new ArrayList<Place>();
@@ -128,14 +128,6 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
         final SupportMapFragment mapFragment = (SupportMapFragment) getSupportFragmentManager().findFragmentById(R.id.map);
         mapFragment.getMapAsync(this);
 
-
-        sitios.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View view) {
-                //getGooglePlaces();
-                //comprovaConnexio();
-            }
-        });
 
         vista.setOnClickListener(new View.OnClickListener() {
             @Override
@@ -204,6 +196,8 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
 
     }
 
+    int razon;
+    boolean botonUbicacionPulsado;
     @Override
     public void onMapReady(GoogleMap googleMap) {
         mMap = googleMap;
@@ -220,22 +214,36 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
         mMap.setMyLocationEnabled(true);
 
 
+
         mMap.setOnCameraMoveStartedListener(new GoogleMap.OnCameraMoveStartedListener() {
             @Override
-            public void onCameraMoveStarted(int i) {
+            public void onCameraMoveStarted(int r) {
+                razon =r;
 
             }
         });
         mMap.setOnCameraIdleListener(new GoogleMap.OnCameraIdleListener() {
             @Override
             public void onCameraIdle() {
-                mMap.clear();
-                lugaresList.clear();
-                markerArrayList.clear();
-                comprovaConnexio();
+                if(razon !=2 || botonUbicacionPulsado) {
+                    mMap.clear();
+                    lugaresList.clear();
+                    markerArrayList.clear();
+                    comprovaConnexio();
+                }
+                botonUbicacionPulsado=false;
                 //Toast.makeText(getApplicationContext(),"menejant camara",Toast.LENGTH_SHORT).show();
             }
         });
+        mMap.setOnMyLocationButtonClickListener(new GoogleMap.OnMyLocationButtonClickListener() {
+            @Override
+            public boolean onMyLocationButtonClick() {
+                botonUbicacionPulsado=true;
+                return false;
+            }
+
+        });
+
 
     }
 
@@ -264,7 +272,7 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
         NetworkInfo networkInfo = connMgr.getActiveNetworkInfo();
         if (networkInfo != null && networkInfo.isConnected()) {
 
-            new ConectaURL().execute("https://maps.googleapis.com/maps/api/place/nearbysearch/json?key=AIzaSyB38CQ8uYvqAmZfTnXAjX1A3IPEYHun-9s&location="+mMap.getCameraPosition().target.latitude+","+mMap.getCameraPosition().target.longitude+"&radius=500&types=food");
+            new ConectaURL().execute("https://maps.googleapis.com/maps/api/place/nearbysearch/json?key=AIzaSyB38CQ8uYvqAmZfTnXAjX1A3IPEYHun-9s&location="+mMap.getCameraPosition().target.latitude+","+mMap.getCameraPosition().target.longitude+"&rankby=distance&types=food|bar|restaurant");
             return true;
         } else {
             /*
